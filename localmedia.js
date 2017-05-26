@@ -1,9 +1,11 @@
 var util = require('util');
 var hark = require('hark');
-var adapter = require('webrtc-adapter');
-var getScreenMedia = require('getscreenmedia');
+// var getScreenMedia = require('getscreenmedia');
 var WildEmitter = require('wildemitter');
 var mockconsole = require('mockconsole');
+var WebRTC = require('react-native-webrtc');
+
+var getUserMedia = WebRTC.getUserMedia;
 
 function isAllTracksEnded(stream) {
     var isAllTracksEnded = true;
@@ -11,6 +13,19 @@ function isAllTracksEnded(stream) {
         isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
     });
     return isAllTracksEnded;
+}
+
+// firefox specifc, but no need to remove
+function shouldWorkAroundFirefoxStopStream() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  if (!window.navigator.mozGetUserMedia) {
+    return false;
+  }
+  var match = window.navigator.userAgent.match(/Firefox\/(\d+)\./);
+  var version = match && match.length >= 1 && parseInt(match[1], 10);
+  return version < 50;
 }
 
 function LocalMedia(opts) {
@@ -39,14 +54,23 @@ function LocalMedia(opts) {
     this._logerror = this.logger.error.bind(this.logger, 'LocalMedia:');
 
     this.localStreams = [];
-    this.localScreens = [];
+    /**
+     * rewrite: removed screen sharing related code
+     */
+    //this.localScreens = [];
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        this._logerror('Your browser does not support local media capture.');
-    }
+    /**
+     * rewrite: removed browser specific code
+     */
+    // if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    //     this._logerror('Your browser does not support local media capture.');
+    // }
 
     this._audioMonitors = [];
     this.on('localStreamStopped', this._stopAudioMonitor.bind(this));
+    /**
+     * may need rewrite: screen related stuff
+     */
     this.on('localScreenStopped', this._stopAudioMonitor.bind(this));
 }
 
@@ -59,7 +83,10 @@ LocalMedia.prototype.start = function (mediaConstraints, cb) {
 
     this.emit('localStreamRequested', constraints);
 
-    navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+    /**
+     * rewrite: replaced navigator.mediaDevices.getUserMedia with just getUserMedia
+     */
+    getUserMedia(constraints).then(function (stream) {
         if (constraints.audio && self.config.detectSpeakingEvents) {
             self._setupAudioMonitor(stream, self.config.harkOptions);
         }
@@ -108,7 +135,7 @@ LocalMedia.prototype.stopStream = function (stream) {
             stream.getTracks().forEach(function (track) { track.stop(); });
 
             //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
-            if (adapter.browserDetails.browser === 'firefox' && adapter.browserDetails.version < 50) {
+            if (shouldWorkAroundFirefoxStopStream()) {
                 this._removeStream(stream);
             }
         }
@@ -117,76 +144,79 @@ LocalMedia.prototype.stopStream = function (stream) {
             stream.getTracks().forEach(function (track) { track.stop(); });
 
             //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
-            if (adapter.browserDetails.browser === 'firefox' && adapter.browserDetails.version < 50) {
+            if (shouldWorkAroundFirefoxStopStream()) {
                 self._removeStream(stream);
             }
         });
     }
 };
 
-LocalMedia.prototype.startScreenShare = function (constraints, cb) {
-    var self = this;
+/**
+ * rewrite: removed screen share related stuff
+ */
+// LocalMedia.prototype.startScreenShare = function (constraints, cb) {
+//     var self = this;
 
-    this.emit('localScreenRequested');
+//     this.emit('localScreenRequested');
 
-    if (typeof constraints === 'function' && !cb) {
-        cb = constraints;
-        constraints = null;
-    }
+//     if (typeof constraints === 'function' && !cb) {
+//         cb = constraints;
+//         constraints = null;
+//     }
 
-    getScreenMedia(constraints, function (err, stream) {
-        if (!err) {
-            self.localScreens.push(stream);
+//     getScreenMedia(constraints, function (err, stream) {
+//         if (!err) {
+//             self.localScreens.push(stream);
 
-            stream.getTracks().forEach(function (track) {
-                track.addEventListener('ended', function () {
-                    var isAllTracksEnded = true;
-                    stream.getTracks().forEach(function (t) {
-                        isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
-                    });
+//             stream.getTracks().forEach(function (track) {
+//                 track.addEventListener('ended', function () {
+//                     var isAllTracksEnded = true;
+//                     stream.getTracks().forEach(function (t) {
+//                         isAllTracksEnded = t.readyState === 'ended' && isAllTracksEnded;
+//                     });
 
-                    if (isAllTracksEnded) {
-                        self._removeStream(stream);
-                    }
-                });
-            });
+//                     if (isAllTracksEnded) {
+//                         self._removeStream(stream);
+//                     }
+//                 });
+//             });
 
-            self.emit('localScreen', stream);
-        } else {
-            self.emit('localScreenRequestFailed');
-        }
+//             self.emit('localScreen', stream);
+//         } else {
+//             self.emit('localScreenRequestFailed');
+//         }
 
-        // enable the callback
-        if (cb) {
-            return cb(err, stream);
-        }
-    });
-};
+//         // enable the callback
+//         if (cb) {
+//             return cb(err, stream);
+//         }
+//     });
+// };
 
-LocalMedia.prototype.stopScreenShare = function (stream) {
-    var self = this;
+// LocalMedia.prototype.stopScreenShare = function (stream) {
+//     var self = this;
 
-    if (stream) {
-        var idx = this.localScreens.indexOf(stream);
-        if (idx > -1) {
-            stream.getTracks().forEach(function (track) { track.stop(); });
+//     if (stream) {
+//         var idx = this.localScreens.indexOf(stream);
+//         if (idx > -1) {
+//             stream.getTracks().forEach(function (track) { track.stop(); });
 
-            //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
-            if (adapter.browserDetails.browser === 'firefox' && adapter.browserDetails.version < 50) {
-                this._removeStream(stream);
-            }
-        }
-    } else {
-        this.localScreens.forEach(function (stream) {
-            stream.getTracks().forEach(function (track) { track.stop(); });
+//             //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
+//             if (shouldWorkAroundFirefoxStopStream()) {
+//                 this._removeStream(stream);
+//             }
+//         }
+//     } else {
+//         this.localScreens.forEach(function (stream) {
+//             stream.getTracks().forEach(function (track) { track.stop(); });
 
-            //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
-            if (adapter.browserDetails.browser === 'firefox' && adapter.browserDetails.version < 50) {
-                self._removeStream(stream);
-            }
-        });
-    }
-};
+//             //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
+//             if (shouldWorkAroundFirefoxStopStream()) {
+//                 self._removeStream(stream);
+//             }
+//         });
+//     }
+// };
 
 // Audio controls
 LocalMedia.prototype.mute = function () {
