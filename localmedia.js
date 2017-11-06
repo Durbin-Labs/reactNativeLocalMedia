@@ -123,7 +123,7 @@ LocalMedia.prototype.start = function (mediaConstraints, cb) {
 
 LocalMedia.prototype.stop = function (stream) {
     this.stopStream(stream);
-    this.stopScreenShare(stream);
+    // this.stopScreenShare(stream);
 };
 
 LocalMedia.prototype.stopStream = function (stream) {
