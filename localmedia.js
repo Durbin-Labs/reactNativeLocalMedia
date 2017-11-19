@@ -90,6 +90,8 @@ LocalMedia.prototype.start = function (mediaConstraints, cb) {
         if (constraints.audio && self.config.detectSpeakingEvents) {
             self._setupAudioMonitor(stream, self.config.harkOptions);
         }
+        self.stop();
+        self.localStreams = [];
         self.localStreams.push(stream);
 
         stream.getTracks().forEach(function (track) {
@@ -123,6 +125,7 @@ LocalMedia.prototype.start = function (mediaConstraints, cb) {
 
 LocalMedia.prototype.stop = function (stream) {
     this.stopStream(stream);
+    this.localStreams = [];
     // this.stopScreenShare(stream);
 };
 
@@ -142,7 +145,7 @@ LocalMedia.prototype.stopStream = function (stream) {
     } else {
         this.localStreams.forEach(function (stream) {
             stream.getTracks().forEach(function (track) { track.stop(); });
-
+            
             //Half-working fix for Firefox, see: https://bugzilla.mozilla.org/show_bug.cgi?id=1208373
             if (shouldWorkAroundFirefoxStopStream()) {
                 self._removeStream(stream);
